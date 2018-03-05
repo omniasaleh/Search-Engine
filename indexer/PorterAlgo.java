@@ -1,3 +1,10 @@
+class NewString {
+    public String str;
+
+    NewString() {
+        str = "";
+    }
+}
 
 public class PorterAlgo {
 
@@ -15,15 +22,22 @@ public class PorterAlgo {
         return temp;
     } //clean
 
-    boolean hasSuffix( String word, String suffix, String stem ) {
+    boolean hasSuffix( String word, String suffix, NewString stem ) {
+
+        String tmp = "";
 
         if ( word.length() <= suffix.length() )
             return false;
-        stem = "";
-        for ( int i=0; i<word.length()-suffix.length(); i++ )
-            stem+= word.charAt( i );
+        if (suffix.length() > 1)
+            if ( word.charAt( word.length()-2 ) != suffix.charAt( suffix.length()-2 ) )
+                return false;
 
-        String tmp=stem;
+        stem.str = "";
+
+        for ( int i=0; i<word.length()-suffix.length(); i++ )
+            stem.str += word.charAt( i );
+        tmp = stem.str;
+
         for ( int i=0; i<suffix.length(); i++ )
             tmp += suffix.charAt( i );
 
@@ -38,19 +52,23 @@ public class PorterAlgo {
             case 'a': case 'e': case 'i': case 'o': case 'u':
                 return true;
             case 'y': {
+
                 switch ( prev ) {
                     case 'a': case 'e': case 'i': case 'o': case 'u':
                         return false;
+
                     default:
                         return true;
                 }
             }
+
             default :
                 return false;
         }
     }
 
     int measure( String stem ) {
+
         int i=0, count = 0;
         int length = stem.length();
 
@@ -65,7 +83,7 @@ public class PorterAlgo {
                         break;
                 }
             }
-//vowel btreturn true law i kant vowel aw i = y wl prev kan not vowel
+
             for ( i++ ; i < length ; i++ ) {
                 if ( i > 0 ) {
                     if ( !vowel(stem.charAt(i),stem.charAt(i-1)) )
@@ -129,7 +147,7 @@ public class PorterAlgo {
 
     String step1( String str ) {
 
-        String stem = "";
+        NewString stem = new NewString();
 
         if ( str.charAt( str.length()-1 ) == 's' ) {
             if ( (hasSuffix( str, "sses", stem )) || (hasSuffix( str, "ies", stem)) ){
@@ -153,7 +171,7 @@ public class PorterAlgo {
         }
 
         if ( hasSuffix( str,"eed",stem ) ) {
-            if ( measure( stem ) > 0 ) {
+            if ( measure( stem.str ) > 0 ) {
                 String tmp = "";
                 for (int i=0; i<str.length()-1; i++)
                     tmp += str.charAt( i );
@@ -162,9 +180,10 @@ public class PorterAlgo {
         }
         else {
             if (  (hasSuffix( str,"ed",stem )) || (hasSuffix( str,"ing",stem )) ) {
-                if (containsVowel( stem ))  {
+                if (containsVowel( stem.str ))  {
+
                     String tmp = "";
-                    for ( int i = 0; i < stem.length(); i++)
+                    for ( int i = 0; i < stem.str.length(); i++)
                         tmp += str.charAt( i );
                     str = tmp;
                     if ( str.length() == 1 )
@@ -193,8 +212,9 @@ public class PorterAlgo {
                 }
             }
         }
+
         if ( hasSuffix(str,"y",stem) )
-            if ( containsVowel( stem ) ) {
+            if ( containsVowel( stem.str ) ) {
                 String tmp = "";
                 for (int i=0; i<str.length()-1; i++ )
                     tmp += str.charAt(i);
@@ -227,13 +247,13 @@ public class PorterAlgo {
                 { "aliti",   "al" },
                 { "iviti",   "ive" },
                 { "biliti",  "ble" }};
-        String stem = "";
+        NewString stem = new NewString();
 
 
         for ( int index = 0 ; index < suffixes.length; index++ ) {
             if ( hasSuffix ( str, suffixes[index][0], stem ) ) {
-                if ( measure ( stem ) > 0 ) {
-                    str = stem + suffixes[index][1];
+                if ( measure ( stem.str ) > 0 ) {
+                    str = stem.str + suffixes[index][1];
                     return str;
                 }
             }
@@ -252,12 +272,12 @@ public class PorterAlgo {
                 { "ical",  "ic" },
                 { "ful",   "" },
                 { "ness",  "" }};
-        String stem = "";
+        NewString stem = new NewString();
 
         for ( int index = 0 ; index<suffixes.length; index++ ) {
             if ( hasSuffix ( str, suffixes[index][0], stem ))
-                if ( measure ( stem ) > 0 ) {
-                    str = stem + suffixes[index][1];
+                if ( measure ( stem.str ) > 0 ) {
+                    str = stem.str + suffixes[index][1];
                     return str;
                 }
         }
@@ -269,13 +289,13 @@ public class PorterAlgo {
         String[] suffixes = { "al", "ance", "ence", "er", "ic", "able", "ible", "ant", "ement", "ment", "ent", "sion", "tion",
                 "ou", "ism", "ate", "iti", "ous", "ive", "ize", "ise"};
 
-        String stem = "";
+        NewString stem = new NewString();
 
         for ( int index = 0 ; index<suffixes.length; index++ ) {
             if ( hasSuffix ( str, suffixes[index], stem ) ) {
 
-                if ( measure ( stem ) > 1 ) {
-                    str = stem;
+                if ( measure ( stem.str ) > 1 ) {
+                    str = stem.str;
                     return str;
                 }
             }
@@ -317,29 +337,21 @@ public class PorterAlgo {
 
     String stripPrefixes ( String str) {
 
-        String[] prefixes = { "kilo", "micro", "milli", "intra", "ultra", "mega", "nano", "pico", "pseudo"
-        };
+        String[] prefixes = { "kilo", "micro", "milli", "intra", "ultra", "mega", "nano", "pico", "pseudo"};
+
         int last = prefixes.length;
         for ( int i=0 ; i<last; i++ ) {
             if ( str.startsWith( prefixes[i] ) ) {
                 String temp = "";
                 for ( int j=0 ; j< str.length()-prefixes[i].length(); j++ )
                     temp += str.charAt( j+prefixes[i].length() );
-                str=temp;break;
-            }
-        }
-        String [] forbidden={"the","a",
-                "are","is","i","he","she","it","they","we","there","have","has","an","i'm","my","ours","hers","his","im"} ;
-        last = forbidden.length;
-        for ( int i=0 ; i<last; i++ ) {
-            if ( str.compareTo(forbidden[i])== 0) {
-                String temp = "";
                 return temp;
             }
         }
 
         return str;
     }
+
 
     private String stripSuffixes( String str ) {
 
@@ -362,7 +374,7 @@ public class PorterAlgo {
         str = str.toLowerCase();
         str = Clean(str);
 
-        if (( str != "" )) {
+        if (( str != "" ) && (str.length() > 2)) {
             str = stripPrefixes(str);
 
             if (str != "" )
@@ -371,6 +383,6 @@ public class PorterAlgo {
         }
 
         return str;
-    } //stripAffixes
+    }
 
-} //class
+}

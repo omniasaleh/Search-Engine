@@ -1,6 +1,10 @@
 package crawler;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.SocketException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import javafx.util.Pair;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -20,67 +24,85 @@ class Spider extends Thread
     public void run ()
     { 
        
-        while(MyData.GetVisited().size()<MyData.MAX_IT()&&!MyData.GetNotVisit().isEmpty())
-        { 
-            String url;    
-            url = MyData.fetch();
-            if(url!=null)
-            SimpleCraw(url);  
-        }
-       
+           while(MyData.GetVisited().size()<MyData.MAX_IT)
+            { 
+               Pair<String, String> url;    
+                url = MyData.fetch();
+                if(url!=null)
+                {
+                    SimpleCrawl(url);  
+                }
+            }
            
-    }
-    public  void SimpleCraw(String url)
+        System.out.println("finished crawling");
+    }     
+    public  void SimpleCrawl(Pair<String, String> url)
     {
         
-        boolean InsertContent;
+      
        try
         {  
-            Connection connection = Jsoup.connect(url).userAgent("Mozilla/5.0 (Windows NT 6.1; WOW64; rv:5.0) Gecko/20100101 Firefox/5.0").timeout(0).followRedirects(true);
-            Document htmlDocument = connection.get();
-        
-            int response =connection.response().statusCode();
-            if(response == 200) //http
+            if(url.getKey().contains("http://")||url.getKey().contains("https://"))
             {
-                
-            System.out.println("the response =200 request page " + url);
-            if(htmlDocument.body()!=null&&htmlDocument!=null)
-            {
-            String text = htmlDocument.body().text();
-            String title= htmlDocument.title();
-            System.out.println("*******************"+title+"**********************");
-            //System.out.println("download from "+Thread.currentThread().getId());
-            InsertContent=MyData.InsertVisit(url,text,title);   
-            //if(MyData.GetVisited()+MyData.GetNotVisit()<MAX_IT)
-            if(InsertContent)
-                {   
-                 
-                Elements linksOnPage = htmlDocument.select("a[href]");
-                System.out.println(" size of retrive "+linksOnPage.size());
-                MyData.InsertNotVisit(linksOnPage);
-                }
+                Connection connection = Jsoup.connect(url.getKey()).timeout(0).followRedirects(true);
+                Document htmlDocument = connection.get();
+
             
-            }
-            }
-              
-           else 
-            {
-                System.out.println("Error retreiving page: " + connection.response().statusCode());
-            }
-                
+            
+                int response =connection.response().statusCode();
+                if(response == 200) //http
+                {   
+              //  System.out.println("the response = 200 request page " + url.getKey());
+                if(htmlDocument.body()!=null)
+                {
+                String text = htmlDocument.body().text();
+                String hashword=md5Hash(text);
+                Elements linksOnPage = htmlDocument.select("a[href]"); 
+                MyData.InsertVisit(url,linksOnPage,hashword,htmlDocument);   
+
+                }
+                }
+
+               else 
+                {
+          //          System.out.println("Error retreiving page: " + connection.response().statusCode());
+                }
+            }           
         }
         catch(SocketException exception)
         {
-            System.out.println("\n connection reset " + url);
-            //SimpleCraw(url);
-            
+        //    System.out.println("\n connection reset " + url);
+                   
         }
        catch (IOException exception)
        {
-       System.out.println("\n We were not successful in our HTTP request " + url);
-       }
+    //   System.out.println("\n We were not successful in our HTTP request " + url);
+       } 
+       
        
     }
+    
+    
+    
+     public static String md5Hash(String message) 
+     {
+        String md5 = "";
+        if(null == message) 
+        	return null;
+        
+        try {
+	        MessageDigest digest = MessageDigest.getInstance("MD5");//Create MessageDigest object for MD5
+	        digest.update(message.getBytes(), 0, message.length());//Update input string in message digest
+	        md5 = new BigInteger(1, digest.digest()).toString(16);//Converts message digest value in base 16 (hex)
+ 
+        } catch (NoSuchAlgorithmException e) 
+        {
+            e.printStackTrace();
+        }
+        return md5;
+    }
+    
+   
     
   
     

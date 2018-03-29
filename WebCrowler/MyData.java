@@ -7,12 +7,15 @@ import org.jsoup.select.Elements;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import java.io.BufferedReader;
 import org.bson.Document;
 import java.io.IOException;
 import java.io.BufferedWriter;
 import java.io.FileOutputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -29,8 +32,8 @@ final class MyData
     private final LinkedHashSet<String> Content;
     private final Map<String,String> Processing;
     private final List<Integer> InCounter;
-    public static final int MAX_IT =100;  //hy3ml crawling 5000 visit
-    public static final int MAX_RE =10;   //hy3ml recrawling l7d 2000 visit
+    public static final int MAX_IT =2000;  //hy3ml crawling 5000 visit
+    public static final int MAX_RE =200;   //hy3ml recrawling l7d 2000 visit
     MongoCollection CollectionVisit ;
     MongoCollection CollectionNotVisit; 
     MongoCollection CollectionRVisit ;
@@ -77,7 +80,9 @@ final class MyData
                 CollectionNotVisit.deleteOne(document);
             URL=processURL(URL);
             //System.out.println("no visited "+GetNotVisit().size());
-            if(!this.Visited.containsKey(URL)&&!this.Processing.containsKey(URL))
+          //  System.out.println(URL);
+            //System.out.println(Robot(URL));
+            if(!this.Visited.containsKey(URL)&&!this.Processing.containsKey(URL)&&Robot(URL))
             {    Pair<String, String> p=new Pair(URL,parent);
                 this.Processing.put(URL,parent);
                 return p;
@@ -346,8 +351,79 @@ final class MyData
         }
         }*/
 
-
-    
+	    
+public static Boolean Robot(String Url){
+	List<String> allMatches = new ArrayList<>();
+	     List<String> allMatches_Allow = new ArrayList<>();
+		 String[] parts = Url.split("(?<=/)");
+		 String SubUrl=parts[0]+parts[1]+parts[2];
+		SubUrl=SubUrl.substring(0, SubUrl.length());
+		if (SubUrl.equals(Url)||SubUrl.equals(Url+"/")){
+                    return true;
+                }
+                
+		 try(BufferedReader in = new BufferedReader(new InputStreamReader(new URL(SubUrl+"/robots.txt").openStream())))
+		    {
+		        String line;
+		        boolean found_user=false;
+		        while((line = in.readLine()) != null) 
+		        {  
+		          int index1 = line.indexOf("User-agent: *");
+		          int index2 = line.indexOf("User-Agent: *");          
+		          if (index1 !=-1 ||index2 !=-1 )
+		            {  found_user=true; 
+		               continue;
+		            }
+				  if (found_user) 
+				    {	  int m = line.indexOf("Disallow: ");
+					   int Allow = line.indexOf("Allow: ");						 
+					   if (m != -1)
+					   { String disallow;
+                                               disallow=line.substring(8,line.length());
+						    
+							 
+							 allMatches.add(disallow.replaceAll(" ", ""));		   
+					   }
+					   else if (Allow != -1)
+					   {
+						 String allow;
+                                                 allow=line.substring(8,line.length());
+						// System.out.println(allow);
+						 allMatches_Allow.add(allow.replaceAll(" ",""));		
+							  
+					  }
+						  
+					   
+		        }}
+		    } 
+		    catch (IOException e) 
+		    {
+		    }
+		 
+		 int size_disallow=0;
+		 int size_allow=0;
+		 for (int counter = 0; counter < allMatches.size(); counter++)
+		 { 		       
+			 boolean found_disallow=Url.contains(allMatches.get(counter));
+			 if (found_disallow)
+			 {
+				 size_disallow= allMatches.get(counter).length();				
+				 break;
+				 
+			 }
+	      }   		
+		 for (int counter = 0; counter < allMatches_Allow.size(); counter++)
+		 { 	
+			 boolean found_allow=Url.contains(allMatches_Allow.get(counter));
+			 if (found_allow)
+			 {
+				 size_allow= allMatches_Allow.get(counter).length();				
+				 break;
+			 }
+	      }
+	
+            return size_disallow <= size_allow;
+	}
     
     
 }

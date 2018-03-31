@@ -132,7 +132,16 @@ public class Master implements Job
     
     
     public void Seeds() throws IOException 
-    {   
+    {   File file = new File("crawl//");      
+         String[] myFiles;    
+       if(file.isDirectory())
+       {
+           myFiles = file.list();
+             for (String myFile1 : myFiles) {
+            File myFile = new File(file, myFile1);
+            myFile.delete();
+            }
+       }
         CollectionRNotVisit.drop();
         CollectionRVisit.drop();
         db.createCollection("RNotVisit");

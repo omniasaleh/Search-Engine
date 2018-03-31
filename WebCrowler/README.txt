@@ -8,6 +8,6 @@ Variables you can change :
 	2- Number of Max Iteration in Crawling. (MAX_IT In MyData class)
 	3- Number of Links you want to recrawl on it. (NUM_RESEED In Master class)
 	4- Number of Max Iteration in Recrawling. (MAX_RE In MyData class)
-
+run MyScheduler.java 
 	
 		

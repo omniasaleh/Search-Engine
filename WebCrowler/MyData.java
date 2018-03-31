@@ -24,8 +24,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import javafx.util.Pair;
 
-
-
 final class MyData 
 {
 
@@ -72,7 +70,7 @@ final class MyData
             String URL;
             String parent;
             URL=NotVisit.entrySet().iterator().next().getKey();
-            System.out.println("fetched "+URL);
+           // System.out.println("fetched "+URL);
             parent=NotVisit.entrySet().iterator().next().getValue();
             this.NotVisit.remove(this.NotVisit.keySet().iterator().next());
             BasicDBObject document = new BasicDBObject();
@@ -93,7 +91,7 @@ final class MyData
               //  System.out.println("there is a duplicate url in visit "+URL);
                 int i = new ArrayList<>(this.Visited.keySet()).indexOf(URL);
                 IncPriority(i,1);
-                System.out.println(this.Priority.get(i));
+             //   System.out.println(this.Priority.get(i));
                 String newparent=new ArrayList<>(this.Visited.values()).get(i);
                 if(!newparent.contains(parent))
                  newparent=newparent+parent;
@@ -171,7 +169,7 @@ final class MyData
                 CollectionRVisit.insertOne(document);
             }*/
            if(this.Type.equals("Recrawling"))
-           {   System.out.println("insert wgh gded");
+           {   //System.out.println("insert wgh gded");
                CollectionRVisit.insertOne(document);
            }
                  
@@ -216,7 +214,7 @@ final class MyData
                     if(Link!="")
                     {   
                         //Link =processURL(Link);
-                        System.out.println("insert not visit "+Link);
+                   //     System.out.println("insert not visit "+Link);
                         if(!this.NotVisit.containsKey(Link))
                         { 
                           this.NotVisit.put(Link,parent);               
@@ -231,7 +229,7 @@ final class MyData
                         else 
                         {
                             //hzwd l parent
-                            System.out.println("there is a duplicate urlin not visit "+Link);
+                       //     System.out.println("there is a duplicate urlin not visit "+Link);
                             int i = new ArrayList<>(this.NotVisit.keySet()).indexOf(Link);
                             String newparent=new ArrayList<>(this.NotVisit.values()).get(i);
                             if(!newparent.contains(parent))
@@ -347,7 +345,11 @@ final class MyData
     {   
       //  System.out.println("hktbbbb");
         Writer writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(path+id+".html"), "utf-8"));       
-        writer.write(htmldoc.toString());      
+        String content = htmldoc.toString();
+        content=content.replaceAll("(?s)<script.*?</script>", "");
+        content = content.replaceAll("(?s)<link.*?>", ""); 
+        content = content.replaceAll("(?s)<noscript.*?</noscript>", ""); 
+        writer.write(content);   
         writer.close();
     
     }
@@ -410,7 +412,7 @@ final class MyData
 
 	    
 public static Boolean Robot(String Url){
-		 List<String> allMatches = new ArrayList<>();
+             List<String> allMatches = new ArrayList<>();
 	     List<String> allMatches_Allow = new ArrayList<>();
 	     String SubUrl ="";
 	     try {

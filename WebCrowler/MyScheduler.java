@@ -23,9 +23,8 @@ public class MyScheduler {
     {
         JobDetail J = JobBuilder.newJob(Master.class).build();
         Trigger t =TriggerBuilder.newTrigger()    
-        .withSchedule(SimpleScheduleBuilder.simpleSchedule().withIntervalInMinutes(5).repeatForever())
+        .withSchedule(SimpleScheduleBuilder.simpleSchedule().withIntervalInHours(24).repeatForever())
         .build();
-       
        Scheduler scheduler =StdSchedulerFactory.getDefaultScheduler();
        scheduler.start();
        scheduler.scheduleJob(J, t);

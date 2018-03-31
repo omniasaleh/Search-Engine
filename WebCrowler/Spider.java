@@ -1,12 +1,16 @@
 package crawler;
+import static crawler.MyData.processURL;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.net.MalformedURLException;
 import java.net.SocketException;
+import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import javafx.util.Pair;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
+import org.jsoup.UncheckedIOException;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
 
@@ -25,30 +29,30 @@ class Spider extends Thread
     { 
        
            while(MyData.GetVisited().size()<MyData.MAX_IT)
-            { 
+            {  
                Pair<String, String> url;    
                 url = MyData.fetch();
                 if(url!=null)
                 {
                     SimpleCrawl(url);  
+                   
                 }
             }
-           
-        System.out.println("finished crawling");
     }     
     public  void SimpleCrawl(Pair<String, String> url)
-    {
+    {  
+        try {
+          URL  ur = new URL(url.getKey());
         
-      
        try
-        {  
-            if(url.getKey().contains("http://")||url.getKey().contains("https://"))
+        { 
+            if(ur.getHost() != null||ur.getHost().length() != 0 )
             {
-                Connection connection = Jsoup.connect(url.getKey()).timeout(0).followRedirects(true);
+                Connection connection = Jsoup.connect(url.getKey()).timeout(2*60*1000).followRedirects(true);
                 Document htmlDocument = connection.get();
-
-            
-            
+                String location =htmlDocument.location();
+                //location =processURL(location);
+                Pair<String, String> location_url=new Pair(location,url.getValue());
                 int response =connection.response().statusCode();
                 if(response == 200) //http
                 {   
@@ -58,8 +62,7 @@ class Spider extends Thread
                 String text = htmlDocument.body().text();
                 String hashword=md5Hash(text);
                 Elements linksOnPage = htmlDocument.select("a[href]"); 
-                MyData.InsertVisit(url,linksOnPage,hashword,htmlDocument);   
-
+                MyData.InsertVisit(location_url,linksOnPage,hashword,htmlDocument);
                 }
                 }
 
@@ -69,16 +72,10 @@ class Spider extends Thread
                 }
             }           
         }
-        catch(SocketException exception)
-        {
-        //    System.out.println("\n connection reset " + url);
-                   
+       catch(SocketException e){  /*    System.out.println("\n connection reset " + url);*/}                
+       catch (IOException | IllegalArgumentException | UncheckedIOException e){/*   System.out.println("\n We were not successful in our HTTP request " + url);*/}
         }
-       catch (IOException exception)
-       {
-    //   System.out.println("\n We were not successful in our HTTP request " + url);
-       } 
-       
+        catch (MalformedURLException ex) {/*Logger.getLogger(Spider.class.getName()).log(Level.SEVERE, null, ex);*/}
        
     }
     

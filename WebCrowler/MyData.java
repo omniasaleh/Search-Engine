@@ -7,6 +7,7 @@ import org.jsoup.select.Elements;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import static com.mongodb.client.model.Filters.eq;
 import java.io.BufferedReader;
 import org.bson.Document;
 import java.io.IOException;
@@ -15,6 +16,7 @@ import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,9 +33,9 @@ final class MyData
     private final Map<String,String> Visited; 
     private final LinkedHashSet<String> Content;
     private final Map<String,String> Processing;
-    private final List<Integer> InCounter;
-    public static final int MAX_IT =2000;  //hy3ml crawling 5000 visit
-    public static final int MAX_RE =200;   //hy3ml recrawling l7d 2000 visit
+    private final List<Integer> Priority;
+    public static final int MAX_IT =5000;  //hy3ml crawling 5000 visit
+    public static final int MAX_RE =5000;   //hy3ml recrawling l7d 2000 visit
     MongoCollection CollectionVisit ;
     MongoCollection CollectionNotVisit; 
     MongoCollection CollectionRVisit ;
@@ -52,7 +54,7 @@ final class MyData
     this.Visited = Collections.synchronizedMap(new LinkedHashMap());
     this.Content=new LinkedHashSet<>();
     this.Processing=Collections.synchronizedMap(new LinkedHashMap());
-    this.InCounter=new ArrayList<>();
+    this.Priority=new ArrayList<>();
     this.db=db;
    // System.out.println("Read from database");
     ReadDBCrawl();
@@ -62,7 +64,7 @@ final class MyData
         
         
 				  
-        //fetch url from nonvisited and check if it is in visited list or proccessing list
+    //fetch url from nonvisited and check if it is in visited list or proccessing list
     public synchronized  Pair<String, String> fetch()
         {
             if(!GetNotVisit().isEmpty())
@@ -70,6 +72,7 @@ final class MyData
             String URL;
             String parent;
             URL=NotVisit.entrySet().iterator().next().getKey();
+            System.out.println("fetched "+URL);
             parent=NotVisit.entrySet().iterator().next().getValue();
             this.NotVisit.remove(this.NotVisit.keySet().iterator().next());
             BasicDBObject document = new BasicDBObject();
@@ -78,29 +81,45 @@ final class MyData
                 CollectionRNotVisit.deleteOne(document);
             else    
                 CollectionNotVisit.deleteOne(document);
-            URL=processURL(URL);
-            //System.out.println("no visited "+GetNotVisit().size());
-          //  System.out.println(URL);
-            //System.out.println(Robot(URL));
+           //&&Robot(URL)
             if(!this.Visited.containsKey(URL)&&!this.Processing.containsKey(URL)&&Robot(URL))
-            {    Pair<String, String> p=new Pair(URL,parent);
+            {   Pair<String, String> p=new Pair(URL,parent);
                 this.Processing.put(URL,parent);
                 return p;
             }
             //if(this.Visited.containsKey(URL))
             else if(this.Visited.containsKey(URL))
-            {
-               //int i = new ArrayList<>(this.Visited).indexOf(URL);
+            { //update ll priority w el parent
+              //  System.out.println("there is a duplicate url in visit "+URL);
                 int i = new ArrayList<>(this.Visited.keySet()).indexOf(URL);
-                IncInCounter(i);
-                this.Visited.put(URL,new ArrayList<>(this.Visited.values()).get(i)+" "+parent);
+                IncPriority(i,1);
+                System.out.println(this.Priority.get(i));
+                String newparent=new ArrayList<>(this.Visited.values()).get(i);
+                if(!newparent.contains(parent))
+                 newparent=newparent+parent;
+                this.Visited.put(URL,newparent);
                 
+                org.bson.Document updateQueryparent =new org.bson.Document();
+                org.bson.Document updateQuerypriority =new org.bson.Document();
+                updateQuerypriority.append("$set", new org.bson.Document("Priority",this.Priority.get(i)));
+                updateQueryparent.append("$set", new org.bson.Document("Parent",newparent));
+                CollectionVisit.updateOne(eq("Url", URL),updateQueryparent);
+                CollectionVisit.updateOne(eq("Url", URL),updateQuerypriority);
+            }
+            else if(this.Processing.containsKey(URL))
+            {
+                int i = new ArrayList<>(this.Processing.keySet()).indexOf(URL);
+                String newparent=new ArrayList<>(this.Processing.values()).get(i);
+                if(!newparent.contains(parent))
+                 newparent=newparent+parent;
+                this.Processing.put(URL,newparent);
             }
             }
+            
             return null;
         }
 
-    public String processURL(String theURL) 
+    public static String processURL(String theURL) 
     {
         int endPos;
         if (theURL.indexOf("?") > 0) 
@@ -115,47 +134,73 @@ final class MyData
         {
             endPos = theURL.length();
         }
-        return theURL.substring(0, endPos);
+        String url_lower=theURL.substring(0, endPos).toLowerCase();
+        if(url_lower.lastIndexOf('/')==url_lower.length()-1)
+            return url_lower.substring(0, url_lower.length()-1);
+        return url_lower;
     }
 
-    public synchronized void InsertVisit(Pair<String, String> url, Elements linksOnPage,String content,org.jsoup.nodes.Document doc) throws IOException
+    public synchronized void InsertVisit(Pair<String, String> url, Elements linksOnPage,String content,org.jsoup.nodes.Document doc) throws IOException 
         {
-            if(this.Content.add(content))
+            if(!this.Visited.containsKey(url.getKey()))
             {
             // System.out.println("the visited url "+url.getKey());
-             this.Visited.put(url.getKey(), url.getValue());
-             this.InCounter.add(1);
+            if( this.Content.add(content))
+            {this.Visited.put(url.getKey(), url.getValue());
+             this.Priority.add(1);
              int id =(int)CollectionVisit.count();
              String parent=Integer.toString(id);
-             String path;
-             
-           //  System.out.println("size of content "+this.Content.size());
-            // System.out.println("size of visited "+this.Visited.size());
-            // System.out.println("size of counter "+this.InCounter.size());  
-             //System.out.println("size of notvisit "+this.NotVisit.size());
-             
+             String path="crawl\\";
+          /*  System.out.println("size of content "+this.Content.size());
+            System.out.println("size of visited "+this.Visited.size());
+            System.out.println("size of counter "+this.Priority.size());  
+            System.out.println("size of notvisit "+this.NotVisit.size());*/
+            //System.out.println("insert **** "+url.getKey());
             Document document = new Document("Id",id) 
             .append("Url",url.getKey())
             .append("Parent",url.getValue()) 
             .append("Content",content)
-            .append("InCounter",1);       
+            .append("Priority",1);       
             CollectionVisit.insertOne(document);
             
-            if(this.Type.equals("Crawling"))
-                 path="C:\\Users\\menna\\Desktop\\html_old\\";
+           /* if(this.Type.equals("Crawling"))
+                 path="old\\";
              else
             {
-                path="C:\\Users\\menna\\Desktop\\html_new\\";
+                path="new\\";
                 CollectionRVisit.insertOne(document);
-            }
+            }*/
+           if(this.Type.equals("Recrawling"))
+           {   System.out.println("insert wgh gded");
+               CollectionRVisit.insertOne(document);
+           }
                  
              writer(doc,id,path);
             
           //  System.out.println("Document inserted successfully");
-            if(Visited.size()+NotVisit.size()<MAX_IT&&linksOnPage!=null)
+            if(Visited.size()+NotVisit.size()<MAX_IT*1.5&&linksOnPage!=null)
                 {     
                    InsertNotVisit(linksOnPage,parent);
                 }
+            }
+            
+           }
+             else
+            { //the visit contain the location
+              //  System.out.println("there is a duplicate url "+url.getKey());
+               // int i = new ArrayList<>(this.Visited).indexOf(URL);
+                int i = new ArrayList<>(this.Visited.keySet()).indexOf(url.getKey());
+                IncPriority(i,1);
+                String newparent=new ArrayList<>(this.Visited.values()).get(i);
+                if(!newparent.contains(url.getValue()))
+                 newparent=newparent+" "+url.getValue();
+                this.Visited.put(url.getKey(),newparent);
+                org.bson.Document updateQueryparent =new org.bson.Document();
+                org.bson.Document updateQuerypriority =new org.bson.Document();
+                updateQuerypriority.append("$set", new org.bson.Document("Priority",this.Priority.get(i)));
+                updateQueryparent.append("$set", new org.bson.Document("Parent",newparent));
+                CollectionVisit.updateOne(eq("Url", url.getKey()),updateQueryparent);
+                CollectionVisit.updateOne(eq("Url", url.getKey()),updateQuerypriority);
                 
             }
            
@@ -166,32 +211,54 @@ final class MyData
     public synchronized void InsertNotVisit(Elements linksOnPage,String parent)
     { //System.out.println("size of retrive "+linksOnPage.size());
          for(Element link : linksOnPage)
-                { String Link=link.absUrl("href");
-                    if(Link!=""&&!this.Visited.containsKey(Link)&&!this.NotVisit.containsKey(Link))
-                    { this.NotVisit.put(Link,parent);
-                      Document docnotvisit = new Document("Url",Link)
-                      .append("Parent",parent);
-                     if(this.Type.equals("Recrawling"))
-                        CollectionRNotVisit.insertOne(docnotvisit);    
-                     else
-                        CollectionNotVisit.insertOne(docnotvisit);
-                      //System.out.println("Document Notvisit inserted successfully");
+                {   
+                    String Link=link.absUrl("href");
+                    if(Link!="")
+                    {   
+                        //Link =processURL(Link);
+                        System.out.println("insert not visit "+Link);
+                        if(!this.NotVisit.containsKey(Link))
+                        { 
+                          this.NotVisit.put(Link,parent);               
+                          Document docnotvisit = new Document("Url",Link)
+                          .append("Parent"," "+parent);
+                         if(this.Type.equals("Recrawling"))
+                            CollectionRNotVisit.insertOne(docnotvisit);    
+                         else
+                            CollectionNotVisit.insertOne(docnotvisit);
+                          //System.out.println("Document Notvisit inserted successfully");
+                        }
+                        else 
+                        {
+                            //hzwd l parent
+                            System.out.println("there is a duplicate urlin not visit "+Link);
+                            int i = new ArrayList<>(this.NotVisit.keySet()).indexOf(Link);
+                            String newparent=new ArrayList<>(this.NotVisit.values()).get(i);
+                            if(!newparent.contains(parent))
+                            {   newparent=newparent+parent;
+                                this.NotVisit.put(Link,newparent);
+                                org.bson.Document updateQuery =new org.bson.Document();
+                                updateQuery.append("$set", new org.bson.Document("Parent",newparent));
+                                CollectionVisit.updateOne(eq("Url", Link),updateQuery);
+                            }
+
+                        }
                     }
 
                 }  
     }
     
     
-    public synchronized void InsertRec(String id,Pair<String,String> url,String in,String con)
+    public synchronized void InsertRec(String id,Pair<String,String> url,int in,String con)
     {
         Visited.put(url.getKey(), url.getValue());
-        InCounter.add(Integer.parseInt(in));
+        Priority.add(in);
         Content.add(con);
         Document document = new Document("Id",id) 
             .append("Url",url.getKey())
             .append("Parent",url.getValue()) 
             .append("Content",con)
-            .append("InCounter",in);       
+            .append("Priority",in);       
             CollectionRVisit.insertOne(document);
     }
 
@@ -209,13 +276,13 @@ final class MyData
     {
         return NotVisit;
     }
-     public synchronized void IncInCounter(int index)
+     public synchronized void IncPriority(int index,int num)
     { 
-       InCounter.set(index,(InCounter.get(index)+1));
+       Priority.set(index,(Priority.get(index)+num));
     }
-     public List<Integer> GetInCounter()
+     public List<Integer> GetPriority()
     { 
-       return InCounter;
+       return Priority;
     }
 
      
@@ -226,30 +293,23 @@ final class MyData
         FindIterable <Document> DocVisit;
         FindIterable <Document> DocNotVisit;
          if(this.Type.equals("Recrawling"))
-         {DocNotVisit = CollectionRNotVisit.find();
-         DocVisit = CollectionRVisit.find();}   
-            else
-         {DocNotVisit=CollectionNotVisit.find();
-         DocVisit = CollectionVisit.find();}
+         {DocNotVisit = CollectionRNotVisit.find(); DocVisit = CollectionRVisit.find();}   
+         else
+         {DocNotVisit=CollectionNotVisit.find(); DocVisit = CollectionVisit.find();}
                 
-        //read all info belongs to visits wesites
-       // System.out.println("read all info belongs to visits");          
+            //read all info belongs to visits wesites
             for (Document myDoc : DocVisit) 
             {   	  
                 String url = myDoc.get("Url").toString();
                 String content=myDoc.get("Content").toString();
                 String parent =myDoc.get("Parent").toString();
-                int incounter=Integer.parseInt(myDoc.get("InCounter").toString());
+                int priority=Integer.parseInt(myDoc.get("Priority").toString());
                 this.Visited.put(url, parent);
                 this.Content.add(content);
-                this.InCounter.add(incounter);
+                this.Priority.add(priority);
 
             }
-           
-            
-            //read urls which are not visited
-        //    System.out.println("read urls which are not visited");  
-            
+            //read urls which are not visited       
             for (Document myDoc : DocNotVisit) 
             {    
                 String url = myDoc.get("Url").toString();
@@ -257,9 +317,6 @@ final class MyData
                 this.NotVisit.put(url,parent);
                 
             }
-            
-        //    System.out.println("the number of initial visited "+this.Visited.size());
-        //    System.out.println("the number of intitial notvisited "+this.NotVisit.size());
    
     }
     
@@ -270,7 +327,7 @@ final class MyData
         System.out.println("Start Read DB Recrawling");
         int NumOfSeeds = 100;
         FindIterable<Document> doc = CollectionVisit.find();
-        BasicDBObject query =new BasicDBObject("InCounter", -1);
+        BasicDBObject query =new BasicDBObject("Priority", -1);
         doc.sort(query).limit(NumOfSeeds);
         //read data in map of not visited 
          for (Document myDoc : doc) 
@@ -306,12 +363,12 @@ final class MyData
         //insert all info belongs to visited url 
         for(int j=(int)CollectionVisit.count();j<new ArrayList<>(Visited.values()).size();j++)  
         { 
-            int in = InCounter.get(j);
+            int in = Priority.get(j);
             Document document = new Document("Id",j) 
             .append("Url", new ArrayList<>(Visited.keySet()).get(j))
             .append("Parent",new ArrayList<>(Visited.values()).get(j)) 
             .append("Content",new ArrayList<>(Content).get(j))
-            .append("InCounter",in);       
+            .append("Priority",in);       
             CollectionVisit.insertOne(document); 
             System.out.println("Document inserted successfully"); 
          }
@@ -353,11 +410,17 @@ final class MyData
 
 	    
 public static Boolean Robot(String Url){
-	List<String> allMatches = new ArrayList<>();
+		 List<String> allMatches = new ArrayList<>();
 	     List<String> allMatches_Allow = new ArrayList<>();
-		 String[] parts = Url.split("(?<=/)");
-		 String SubUrl=parts[0]+parts[1]+parts[2];
-		SubUrl=SubUrl.substring(0, SubUrl.length());
+	     String SubUrl ="";
+	     try {
+             URL url = new URL(Url);
+             SubUrl =url.getProtocol() + "://" + url.getHost();
+	     
+	     }
+         catch (MalformedURLException e) {}
+                  
+		//SubUrl=SubUrl.substring(0, SubUrl.length());
 		if (SubUrl.equals(Url)||SubUrl.equals(Url+"/")){
                     return true;
                 }
@@ -375,20 +438,18 @@ public static Boolean Robot(String Url){
 		               continue;
 		            }
 				  if (found_user) 
-				    {	  int m = line.indexOf("Disallow: ");
-					   int Allow = line.indexOf("Allow: ");						 
+				    {
+					  int m = line.indexOf("Disallow: ");
+					   int Allow = line.indexOf("Allow: ");
 					   if (m != -1)
 					   { String disallow;
-                                               disallow=line.substring(8,line.length());
-						    
-							 
+                                               disallow=line.substring(10,line.length());							 
 							 allMatches.add(disallow.replaceAll(" ", ""));		   
 					   }
 					   else if (Allow != -1)
 					   {
 						 String allow;
                                                  allow=line.substring(8,line.length());
-						// System.out.println(allow);
 						 allMatches_Allow.add(allow.replaceAll(" ",""));		
 							  
 					  }
@@ -421,7 +482,7 @@ public static Boolean Robot(String Url){
 				 break;
 			 }
 	      }
-	
+		
             return size_disallow <= size_allow;
 	}
     
